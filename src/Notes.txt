@@ -1,0 +1,11 @@
+Led codes:
+. - . Radio problem
+
+
+Radio Handler ids
+  Ground:
+  0 - Heartbeat
+  Drone:
+  0 - Heartbeat
+
+  
