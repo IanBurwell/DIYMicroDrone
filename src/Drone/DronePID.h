@@ -1,12 +1,13 @@
 #include "Arduino.h"
 #include <queue>
 
+#define AVERAGE_SIZE 4
+
 class DronePID{
 public:
   DronePID(float* output, float* setPoint, float* p, float* i, float* d);
 
-  void update(float input);
-  void setSpeed(short hz);
+  void updateRun(float input);
 private:
 
   float* out;
@@ -15,7 +16,6 @@ private:
   float* kI;
   float* kD;
 
-  unsigned short dT;
   unsigned long lastMillis;
   float integral;
   float rollAvgTot;

@@ -1,31 +1,23 @@
-#include "Comms.h"
-#include <Arduino.h>
-
-void handleHeartbeat(unsigned char data[], unsigned char len);
-Comms* comm;
-
-unsigned long lastTime;
-
-void setup(){
-  Comms::DataHandler handlers[1];
-  handlers[0] = &handleHeartbeat;
-  comm = new Comms(false, 1, handlers);
-
-  lastTime = millis();
-
-  while (!Serial);
-  Serial.begin(9600);
-  delay(100);
-  Serial.println("Init done");
-}
+#include "Control.h"
 
 
-void loop(){
-  comm->updateRun();
+Control *control;
+void setup(void){
+
+  control = new Control(10);
+
+  delay(5000);
+  control->setArm(true);
+
+  control->rKP = 6;
 
 }
 
-void handleHeartbeat(unsigned char data[], unsigned char len){
-  Serial.print("Got heartbeat ("); Serial.print(millis()-lastTime); Serial.println("ms)");
-  lastTime = millis();
+
+void loop(void){
+
+
+  control->updateRun();
+
+
 }

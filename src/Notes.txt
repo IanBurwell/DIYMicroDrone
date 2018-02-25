@@ -1,6 +1,6 @@
 Led codes:
 . - . Radio problem
-
+. . IMU init fail
 
 Radio Handler ids
   Ground:
@@ -8,4 +8,8 @@ Radio Handler ids
   Drone:
   0 - Heartbeat
 
-  
+
+Motor config (top down):
+M1  ^  M2
+    |
+M3  |  M4

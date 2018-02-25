@@ -8,19 +8,15 @@ DronePID::DronePID(float* output, float* setPoint, float* p, float* i, float* d)
   kI = i;
   kD = d;
 
-  dT = 100;
   integral = 0;
   rollAvgTot = 0.0f;
   lastMillis = millis();
 }
 
 
-void DronePID::update(float input){
+void DronePID::updateRun(float input){
   unsigned long now = millis();
   unsigned long timeChange = (now - lastMillis);
-
-  if(timeChange < dT)
-    return;
 
   ////PID////
   float error = *sP-input;
