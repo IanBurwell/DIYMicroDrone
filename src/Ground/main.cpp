@@ -1,39 +1,34 @@
-#include "Comms.h"
-#include <Arduino.h>
+#include "Control.h"
 
-void handleHeartbeat(unsigned char data[], unsigned char len);
-Comms* comm;
 
-unsigned long lastTime;
-bool ledState;
+Control *control;
+void setup(void){
 
-void setup(){
-  Comms::DataHandler handlers[1];
-  handlers[0] = &handleHeartbeat;
-  comm = new Comms(true, 1, handlers);
-
-  lastTime = millis();
-  ledState = false;
-  pinMode(13, OUTPUT);
+  control = new Control(4000);
 
   Serial.begin(9600);
-  delay(100);
-  Serial.println("Init done");
+  control->setArm(true);
 }
 
 
-void loop(){
+void loop(void){
+  control->updateRun();
+
   if(Serial.available()){
-    uint8_t data[] = {0, 1};
-    comm->queueData(data);
+
+    String in = Serial.readString();
+    if(in.charAt(0) == 'p'){
+      in = in.substring(1);
+      control->rKP = in.toFloat();
+      Serial.println(in.toFloat());
+    }else if(in.charAt(0) == 'd'){
+      in = in.substring(1);
+      control->rKD = in.toFloat();
+      Serial.println(in.toFloat());
+    }else if(in.charAt(0) == 's'){
+      in = in.substring(1);
+      control->setRoll(in.toFloat());
+      Serial.println(in.toFloat());
+    }
   }
-  comm->updateRun();
-}
-
-
-void handleHeartbeat(unsigned char data[], unsigned char len){
-  Serial.print("Got heartbeat ("); Serial.print(millis()-lastTime); Serial.println("ms)");
-  lastTime = millis();
-  digitalWrite(13, (ledState ? HIGH : LOW));
-  ledState = !ledState;
 }

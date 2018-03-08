@@ -1,6 +1,6 @@
 #include "Control.h"
 
-Control::Control(uint8_t hz){
+Control::Control(uint16_t hz){
   rollPID = new DronePID(&rOut, &rollSP, &rKP, &rKI, &rKD);
   pitchPID = new DronePID(&pOut, &pitchSP, &pKP, &pKI, &pKD);
   yawPID = new DronePID(&yOut, &yawSP, &yKP, &yKI, &yKD);
@@ -29,9 +29,11 @@ void Control::updateRun(){
     rollPID->updateRun(vector.z());
     pitchPID->updateRun(vector.y());
     yawPID->updateRun(vector.x());
-
     pidToMotors();
   }
+  
+  Serial.println(millis()-lastMillis);
+  lastMillis = millis();
 }
 
 
@@ -42,7 +44,6 @@ void Control::pidToMotors(){
   float RFront = base - rOut - pOut;//-yOut;
   float LRear = base + rOut + pOut;//-yOut;
   float RRear = base - rOut + pOut;//+uOut;
-
   setMotors(LFront, RFront, LRear, RRear);
 }
 
@@ -58,10 +59,17 @@ void Control::setMotors(float M1, float M2, float M3, float M4, bool enabled, bo
       else
         motors[i]->run(FORWARD);
 
-  motors[0]->setSpeed(constrain(abs(M1), 0, MAX_SPEED));
-  motors[1]->setSpeed(constrain(abs(M2), 0, MAX_SPEED));
-  motors[2]->setSpeed(constrain(abs(M3), 0, MAX_SPEED));
-  motors[3]->setSpeed(constrain(abs(M1), 0, MAX_SPEED));
+  if(!fullRange){
+    M1 = constrain(M1, MOTOR_IDLE, MAX_SPEED);
+    M2 = constrain(M2, MOTOR_IDLE, MAX_SPEED);
+    M3 = constrain(M3, MOTOR_IDLE, MAX_SPEED);
+    M4 = constrain(M4, MOTOR_IDLE, MAX_SPEED);
+  }
+
+  motors[0]->setSpeed(constrain(abs(M1), MOTOR_IDLE, MAX_SPEED));
+  motors[1]->setSpeed(constrain(abs(M2), MOTOR_IDLE, MAX_SPEED));
+  motors[2]->setSpeed(constrain(abs(M3), MOTOR_IDLE, MAX_SPEED));
+  motors[3]->setSpeed(constrain(abs(M4), MOTOR_IDLE, MAX_SPEED));
 }
 
 
@@ -76,7 +84,7 @@ bool Control::beep(uint16_t length){
 
 bool Control::setArm(bool arm){
   if(!armed && arm){//arming
-    rollSP = pitchSP = yawSP = 0;
+    rollSP = pitchSP = yawSP = 0.0f;
     setMotors(MOTOR_IDLE,MOTOR_IDLE,MOTOR_IDLE,MOTOR_IDLE);
   }else if(!arm && armed){//dissarming
     setMotors(0,0,0,0,false);

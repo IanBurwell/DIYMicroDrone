@@ -17,11 +17,11 @@ private:
   float* kD;
 
   unsigned long lastMillis;
-  float integral;
-  float rollAvgTot;
+  float integral = 0;
+  float rollAvgTot = 0;
 
   std::queue <float> pastValues;
-  float maxO, minO;
+  float maxO = 100, minO = 0;
 
   void updatePastVal(float val);
   float getPastAvg();

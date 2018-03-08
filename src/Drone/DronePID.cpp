@@ -23,13 +23,16 @@ void DronePID::updateRun(float input){
   float tOut = 0.0f;
   ////Calc P
   tOut += *kP * error;
+
   ////Calc I
   integral += (timeChange)*error;
   tOut += *kI * integral;
+
   ////Calc D
   tOut += *kD * ((error-getPastAvg())/(timeChange));
 
-  out = &tOut;
+
+  *out = tOut;
   lastMillis = now;
   updatePastVal(error);
 }
