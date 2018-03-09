@@ -45,23 +45,7 @@ Comms::Comms(bool isMaster, uint16_t hz, DataHandler handlers[]){
 
 
 void Comms::updateRun(){
-  ////send////
-  if(master && millis()-lastSentMilis >= pingDelay){
-    send();
-  }
 
-  ////recieve////
-  if (rf69.available()){
-    // Should be a message
-    uint8_t len = sizeof(buffer);
-    if (rf69.recv(buffer, &len)){
-        dataHandlers[buffer[0]](buffer, len);
-    }else{                                                  //TODO handle failure
-    }
-    if(!master){
-      send();
-    }
-  }
 
 }
 

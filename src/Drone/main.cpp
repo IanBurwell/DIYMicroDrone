@@ -4,7 +4,6 @@
 
 #define MINT 150
 
-
 double Setpoint, Input, Output;
 double Setpoint2, Input2, Output2;
 
@@ -16,6 +15,7 @@ Adafruit_DCMotor *M1, *M2, *M3, *M4;
 
 void setup()
 {
+
   Serial.begin(9600);
   if(!bno.begin())
     Serial.println("Gyro fail");

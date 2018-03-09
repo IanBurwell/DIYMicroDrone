@@ -31,7 +31,7 @@ public:
 
   void updateRun();
 
-  //first element should be the ide, followed by some data
+  //first element should be the id, followed by some data
   void queueData(uint8_t data[RH_RF69_MAX_MESSAGE_LEN]);
   int8_t getLastRSSI();
 
