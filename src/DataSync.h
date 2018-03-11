@@ -46,8 +46,8 @@ NOTES:
 
 class DataSync {
 public:
-  DataSync(uint8_t realtimeLen = 0);//SLAVE
-  DataSync(uint16_t hz, uint8_t realtimeLen = 0);//MASTER
+  DataSync(uint8_t realtimeLen);//SLAVE
+  DataSync(uint16_t hz, uint8_t realtimeLen);//MASTER
 
   void updateRun();
   int8_t getLastRSSI();
@@ -62,25 +62,26 @@ public:
   uint8_t getInt8(uint8_t key);
   uint8_t getInt16(uint8_t key);
 
-  void setRealTimeValue(uint8_t idx);
-  void getRealTimeValue(uint8_t idx);
+  void setRealTimeValue(uint8_t idx, uint8_t val);
+  uint8_t getRealTimeValue(uint8_t idx);
 
   void resyncAll();
+  bool waitForHeartbeat(uint16_t timeout);
+
+  //conversions between bytes and data
+  static uint16_t bti(uint8_t *data);
+  static float btf(uint8_t *data);
+  static bool btbl(uint8_t data);
+
+  static void itb(uint16_t i, uint8_t (&data)[2]);
+  static void ftb(float f, uint8_t (&data)[4]);
+  static void bltb(bool b, uint8_t &data);
 
 private:
   struct Data{
     uint8_t *data;
     uint8_t type;
   };
-
-  //conversions between bytes and data
-  uint16_t bti(uint8_t *data);
-  float btf(uint8_t *data);
-  bool btbl(uint8_t data);
-
-  void itb(uint16_t i, uint8_t (&data)[2]);
-  void ftb(float f, uint8_t (&data)[4]);
-  void bltb(bool b, uint8_t &data);
 
   //send/recieve
   void send();
@@ -90,14 +91,15 @@ private:
   //STD things
   std::map<uint8_t, Data> variables;
   std::vector<uint8_t> valuesToSend;
-  std::queue<unsigned char> keysToUpdate;
 
   //arrays
   uint8_t buffer[RH_RF69_MAX_MESSAGE_LEN];
-  uint8_t *realtimeBytes;//holds first byte as # values and rest are for rtb
+  uint8_t *realtimeBytesOut;//holds first byte as # values and rest are for rtb
+  uint8_t *realtimeBytesIn;
 
   //other variables
-  uint8_t realtimeLen = 0;
+  uint8_t realtimeLenOut = 0;
+  uint8_t realtimeLenIn = 0;
   unsigned long lastSentMilis;
   bool master = false;
   uint16_t pingDelay = 0;

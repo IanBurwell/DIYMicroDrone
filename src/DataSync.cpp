@@ -2,17 +2,20 @@
 
 RH_RF69 rf69(RFM69_CS, RFM69_INT);
 
-DataSync::DataSync(uint16_t hz, uint8_t rtl) : DataSync(realtimeLen){         //TODO does dis actaully work????
-  master = true;
+DataSync::DataSync(uint16_t hz, uint8_t rtl) : DataSync(rtl){
+  master = true;                                                              //TODO add something that counts messages and detects packet loss (so can test dissconnect)
   pingDelay = (1/hz)*1000;
 }
 
 DataSync::DataSync(uint8_t rtl){
   lastSentMilis = millis();
-  realtimeBytes = new uint8_t[rtl+1];
-  realtimeLen = rtl+1;
-  realtimeBytes[0] = 0;
+  realtimeBytesOut = new uint8_t[rtl+1];
+  realtimeLenOut = rtl+2;
+  realtimeBytesOut[0] = 0;
+  realtimeBytesOut[1] = rtl+2;
 
+  realtimeLenIn = 0;
+  realtimeBytesIn = 0;
 
   pinMode(LED_PIN, OUTPUT);
   //error out
@@ -49,7 +52,7 @@ void DataSync::updateRun(){
 void DataSync::recieveUpdate(){
   if (rf69.available()){
     // Should be a message
-    uint8_t len = sizeof(buffer);
+    uint8_t len = RH_RF69_MAX_MESSAGE_LEN;
     if (rf69.recv(buffer, &len)){
       buffToMap();
     }else{}                                                  //TODO handle failure
@@ -60,12 +63,12 @@ void DataSync::recieveUpdate(){
 
 void DataSync::send(){
   if(valuesToSend.empty()){
-    rf69.send(realtimeBytes, sizeof(realtimeBytes));
+    rf69.send(realtimeBytesOut, realtimeLenOut);
     rf69.waitPacketSent();
   }else{
     //get number values able to be sent
     uint8_t len = 0, numVals;
-    for(numVals = 0; numVals < valuesToSend.size() && len+LRGEST_VALUE_BYTE_SET+realtimeLen < RH_RF69_MAX_MESSAGE_LEN; numVals++)
+    for(numVals = 0; numVals < valuesToSend.size() && len+LRGEST_VALUE_BYTE_SET+realtimeLenOut < RH_RF69_MAX_MESSAGE_LEN; numVals++)
       switch(variables[valuesToSend.at(numVals)].type){
         case 0: len += 3; break;
         case 1: len += 3; break;
@@ -74,24 +77,27 @@ void DataSync::send(){
       }
     //make data array
     //realtime bytes and # variables
-    uint8_t* data = new uint8_t[len+realtimeLen];
-    for(uint8_t i = 0; i < realtimeLen; i++)
-      data[i] = realtimeBytes[i];
+    uint8_t* data = new uint8_t[len+realtimeLenOut];
+    for(uint8_t i = 0; i < realtimeLenOut; i++)
+      data[i] = realtimeBytesOut[i];
     data[0] = numVals;
     //add in values
-    uint8_t pos = realtimeLen;
+    uint8_t pos = realtimeLenOut;
     for(uint8_t i = 0; i < numVals; i++){
       data[pos] = valuesToSend.front();
       data[pos+1] = variables[valuesToSend.front()].type;
       switch(variables[valuesToSend.front()].type){
         case 0:
+          data[pos+2] = variables[valuesToSend.front()].data[0];
+          pos += 3;
+          break;
         case 1:
           data[pos+2] = variables[valuesToSend.front()].data[0];
           pos += 3;
           break;
         case 2:
-        data[pos+2] = variables[valuesToSend.front()].data[0];
-        data[pos+3] = variables[valuesToSend.front()].data[1];
+          data[pos+2] = variables[valuesToSend.front()].data[0];
+          data[pos+3] = variables[valuesToSend.front()].data[1];
           pos += 4;
           break;
         case 3:
@@ -105,7 +111,7 @@ void DataSync::send(){
       valuesToSend.erase(valuesToSend.begin());//removes first element, not efficient but hey im no CS
     }
 
-    rf69.send(data, sizeof(data));
+    rf69.send(data, realtimeLenOut+len);
     rf69.waitPacketSent();
     delete[] data;
   }
@@ -113,13 +119,20 @@ void DataSync::send(){
 }
 
 void DataSync::buffToMap(){
+  //if the rtb in is different size than we expect, increase our rtsin size
+  if(buffer[1] > realtimeLenIn){
+    realtimeLenIn = buffer[1];
+    delete[] realtimeBytesIn;
+    realtimeBytesIn = new uint8_t[realtimeLenIn];
+  }
+
   //get realtime data
-   for(int i = 1; i < realtimeLen; i++){
-     realtimeBytes[i] = buffer[i];
+   for(int i = 0; i < realtimeLenIn; i++){
+     realtimeBytesIn[i] = buffer[i+1];
    }
-   uint8_t pos = realtimeLen;
+   uint8_t pos = realtimeLenOut;
    //get other data and store to map
-   for(int i = 0; i < buffer[0]; i++){
+   for(uint8_t i = 0; i < buffer[0]; i++){
      uint8_t length;
      switch(buffer[pos+1]){
        case 0: length = 1; break;
@@ -128,12 +141,19 @@ void DataSync::buffToMap(){
        case 3: length = 4; break;
        default: length = 1; break;
      }
-     uint8_t val[length];
-     for(int j = 0; j < length; j++){
-       val[j] = buffer[pos+3+j];
+     uint8_t *val = new uint8_t[length];
+     for(uint8_t j = 0; j < length; j++){
+       val[j] = buffer[pos+2+j];
      }
-     Data data = {val, buffer[pos+1]};
-     variables[buffer[pos]] = data;
+
+     //save data to map
+     if(variables.count(buffer[pos])){
+       variables[buffer[pos]].type = buffer[pos+1];
+       variables[buffer[pos]].data = val;
+     }else{
+       Data data = {val, buffer[pos+1]};
+       variables[buffer[pos]] = data;
+     }
      pos += 2 + length;
    }
 }
@@ -184,7 +204,7 @@ void DataSync::updateMap(uint8_t key, uint8_t value){
     Data data = {&value, (uint8_t)1};
     variables[key] = data;
   }
-  keysToUpdate.push(key);
+  valuesToSend.push_back(key);
 }
 
 void DataSync::updateMap(uint8_t key, bool value){
@@ -197,7 +217,7 @@ void DataSync::updateMap(uint8_t key, bool value){
     Data data = {&arr, 0};
     variables[key] = data;
   }
-  keysToUpdate.push(key);
+  valuesToSend.push_back(key);
 }
 
 void DataSync::updateMap(uint8_t key, uint16_t value){
@@ -210,7 +230,7 @@ void DataSync::updateMap(uint8_t key, uint16_t value){
     Data data = {arr, 2};
     variables[key] = data;
   }
-  keysToUpdate.push(key);
+  valuesToSend.push_back(key);
 }
 
 void DataSync::updateMap(uint8_t key, float value){
@@ -223,7 +243,7 @@ void DataSync::updateMap(uint8_t key, float value){
     Data data = {arr, 3};
     variables[key] = data;
   }
-  keysToUpdate.push(key);
+  valuesToSend.push_back(key);
 }
 
 float DataSync::getFloat(uint8_t key){
@@ -245,7 +265,7 @@ uint8_t DataSync::getInt16(uint8_t key){
 
 /****************************Other Functions***********************************/
 
-void DataSync::resyncAll(){
+void DataSync::resyncAll(){                                                     //TODO implement and make the datarype indicator the flag
   uint8_t syncVal = 255;
   if(variables.count(syncVal)){
     variables[syncVal].type = syncVal;
@@ -254,9 +274,30 @@ void DataSync::resyncAll(){
     Data data = {&syncVal, syncVal};
     variables[syncVal] = data;
   }
-  keysToUpdate.push(syncVal);
+  valuesToSend.push_back(255);
 }
 
 int8_t DataSync::getLastRSSI(){
   return rf69.lastRssi();
+}
+
+void DataSync::setRealTimeValue(uint8_t idx, uint8_t val){
+  if(idx<realtimeLenOut-2)
+    realtimeBytesOut[idx+2] = val;
+}
+
+uint8_t DataSync::getRealTimeValue(uint8_t idx){
+  if(idx<realtimeLenIn-1)
+    return realtimeBytesIn[idx+1];
+  else
+    return 0;
+}
+
+bool DataSync::waitForHeartbeat(uint16_t timeout = 10000){
+  unsigned long startMillis = millis();
+  while(!rf69.available() && millis()-startMillis < timeout){
+    if(master) send();
+    delay(100);
+  }
+  return !rf69.available();
 }

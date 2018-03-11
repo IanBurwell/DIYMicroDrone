@@ -1,6 +1,7 @@
 #include <PID_v1.h>
 #include <Adafruit_BNO055.h>
 #include <Adafruit_MotorShield.h>
+#include "DataSync.h"
 
 #define MINT 150
 
@@ -13,8 +14,13 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *M1, *M2, *M3, *M4;
 
+DataSync *dsync;
+
 void setup()
 {
+ dsync = new DataSync(4);
+
+pinMode(13, OUTPUT);
 
   Serial.begin(9600);
   if(!bno.begin())
@@ -45,15 +51,15 @@ void setup()
 
   ratePID.SetSampleTime(100);
   ratePID.SetOutputLimits(-255, 255);
+
+  dsync->updateMap(1, (float)1.0f);
 }
 
-float kp = 2;
 void loop()
 {
+  dsync->updateRun();
+  float kp = dsync->getFloat(1);
 
-  if(Serial.available()){
-    kp = Serial.parseFloat();
-  }
   //Input = bno.getVector(Adafruit_BNO055::VECTOR_EULER).z();
   Input2 = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE).z();//in rads per second
   //ratePID.Compute();
@@ -62,7 +68,18 @@ void loop()
   M2->setSpeed(MINT+constrain(-Output2, 0, 255-MINT));
   M3->setSpeed(MINT+constrain(Output2, 0, 255-MINT));
   M4->setSpeed(MINT+constrain(-Output2, 0, 255-MINT));
-  Serial.print(Input2);
-  Serial.print("  ");
-  Serial.println(Output2);
+
+  if(millis() % 100 == 0){
+    Serial.print((uint8_t)Input2);
+    Serial.print("  ");
+    Serial.println(kp);
+  }
+
+  uint8_t data[4];
+  DataSync::ftb((float)Input2, data);
+
+  dsync->setRealTimeValue(0, data[0]);
+  dsync->setRealTimeValue(1, data[1]);
+  dsync->setRealTimeValue(2, data[2]);
+  dsync->setRealTimeValue(3, data[3]);
 }
