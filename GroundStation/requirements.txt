@@ -1,0 +1,2 @@
+#Modules Required:
+PySerial (pip3 install pyserial)
